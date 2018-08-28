@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>PointerEvents</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			html {
+				width: 100%;
+				height: 100%;
+			}
+			body {
+				margin: 0px;
+				background-color: #333;
+				color: #fff;
+				font-family:Monospace;
+				font-size: 15px;
+				line-height: 30px;
+				overflow: hidden;
+				width: 100%;
+				height: 100%;
+			}
+			#div1,
+			#div2,
+			#div3,
+			#div4 {
+				float: left;
+				width: 50%;
+				height: 50%;
+				background-image: linear-gradient(to bottom right, #004455, #006688);
+				position: relative;
+				overflow: visible;
+			}
+		</style>
+	</head>
+	<body>
+
+		<div id="div1"></div>
+		<div id="div2"></div>
+		<div id="div3"></div>
+		<div id="div4"></div>
+
+		<script type="module">
+
+			import {PointerEvents} from "./PointerEvents.js";
+			import {IoElement, html} from "./lib/io.min.js";
+
+			export class PointerMarker extends IoElement {
+				static get style() {
+					return html`
+						<style>
+							:host {
+								pointer-events: none;
+								position: absolute;
+								overflow: visible;
+								top: 0;
+								left: 0;
+								width: 100%;
+								height: 100%;
+							}
+							:host .marker {
+								z-index: 2;
+								line-height: 1em;
+								position: fixed;
+							}
+							:host .center {
+								position: absolute;
+								top: -10px;
+								left: -10px;
+								height: 20px;
+								width: 20px;
+								background-color: #bbb;
+								border-radius: 50%;
+								display: inline-block;
+							}
+							:host .info {
+								position: absolute;
+								display: inline-block;
+								top: 15px;
+								left: 5px;
+								white-space: nowrap;
+								background: rgba(0, 255, 0, 0.2);
+							}
+						</style>
+					`;
+				}
+				static get properties() {
+					return {
+						pointer: {
+							type: Object,
+							observer: 'pointerChanged'
+						}
+					}
+				}
+				pointerChanged() {
+					const p = this.pointer;
+					const rect = p.toRectSpace();
+					this.template([
+						['span', {className: 'marker', style: { top: p.clientY + 'px', left: p.clientX + 'px' } }, [
+							['span', {className: 'center'}],
+							['span', {className: 'info'}, [
+								['div', 'id: ' + p.pointerID],
+								['div', 'type: ' + p.type],
+								['div', 'pointerType: ' + p.pointerType],
+								['div', 'button: ' + p.button],
+								['div', 'buttons: ' + p.buttons],
+								['div', 'target: ' + p.target.id],
+								['div', 'x: ' + p.x],
+								['div', 'y: ' + p.y],
+								['div', 'movementX: ' + p.movementX],
+								['div', 'movementY: ' + p.movementY],
+								['div', 'distanceX: ' + p.distanceX],
+								['div', 'distanceY: ' + p.distanceY],
+								['div', 'x: ' + rect.clientX],
+								['div', 'y: ' + rect.clientY],
+								// ['div', 'movementX: ' + rect.movementX],
+								// ['div', 'movementY: ' + rect.movementY],
+								// ['div', 'distanceX: ' + rect.distanceX],
+								// ['div', 'distanceY: ' + rect.distanceY],
+							]]
+						]],
+						['span', {className: 'marker', style: { top: p.clientY - p.distanceY + 'px', left: p.clientX - p.distanceX + 'px' } }, [
+							['span', {className: 'center'}],
+							['span', {className: 'info'}, [
+								['div', 'startid: ' + this.pointer.pointerID],
+							]]
+						]]
+					]);
+				}
+			}
+
+			PointerMarker.Register();
+
+			function updateMarkers( pointers ) {
+				const div = pointers.target;
+
+				div.innerHTML = '';
+
+				for (var i = 0; i < pointers.length; i++) {
+					let p = pointers[i];
+					let id = p.pointerID;
+					div.pointerMarkers = div.pointerMarkers || {};
+					if (!div.pointerMarkers[id]) div.pointerMarkers[id] = new PointerMarker();
+					div.pointerMarkers[id].pointer = p;
+					div.appendChild(div.pointerMarkers[id]);
+				}
+			}
+
+			const divs = document.body.querySelectorAll('div');
+			divs.forEach( div => {
+				let pointerEvents = new PointerEvents(div)
+				pointerEvents.addEventListener( 'pointerdown', updateMarkers );
+				pointerEvents.addEventListener( 'pointermove', updateMarkers );
+				pointerEvents.addEventListener( 'pointerup', updateMarkers );
+			} );
+
+		</script>
+
+	</body>
+</html>
