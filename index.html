@@ -94,9 +94,9 @@
 				}
 				pointerChanged() {
 					const p = this.pointer;
-					const rect = p.toRectSpace();
+					const rect = this.pointer.target.getBoundingClientRect();
 					this.template([
-						['span', {className: 'marker', style: { top: p.clientY + 'px', left: p.clientX + 'px' } }, [
+						['span', {className: 'marker', style: { top: p.position.y + rect.y + 'px', left: p.position.x + rect.x + 'px' } }, [
 							['span', {className: 'center'}],
 							['span', {className: 'info'}, [
 								['div', 'id: ' + p.pointerID],
@@ -105,21 +105,15 @@
 								['div', 'button: ' + p.button],
 								['div', 'buttons: ' + p.buttons],
 								['div', 'target: ' + p.target.id],
-								['div', 'x: ' + p.x],
-								['div', 'y: ' + p.y],
-								['div', 'movementX: ' + p.movementX],
-								['div', 'movementY: ' + p.movementY],
-								['div', 'distanceX: ' + p.distanceX],
-								['div', 'distanceY: ' + p.distanceY],
-								['div', 'x: ' + rect.clientX],
-								['div', 'y: ' + rect.clientY],
-								// ['div', 'movementX: ' + rect.movementX],
-								// ['div', 'movementY: ' + rect.movementY],
-								// ['div', 'distanceX: ' + rect.distanceX],
-								// ['div', 'distanceY: ' + rect.distanceY],
+								['div', 'x: ' + p.position.x],
+								['div', 'y: ' + p.position.y],
+								['div', 'movement.x: ' + p.movement.x],
+								['div', 'movement.y: ' + p.movement.y],
+								['div', 'distance.x: ' + p.distance.x],
+								['div', 'distance.y: ' + p.distance.y]
 							]]
 						]],
-						['span', {className: 'marker', style: { top: p.clientY - p.distanceY + 'px', left: p.clientX - p.distanceX + 'px' } }, [
+						['span', {className: 'marker', style: { top: p.start.y + rect.y + 'px', left: p.start.x + rect.x + 'px' } }, [
 							['span', {className: 'center'}],
 							['span', {className: 'info'}, [
 								['div', 'startid: ' + this.pointer.pointerID],

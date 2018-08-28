@@ -3,7 +3,9 @@
  *
  * This class provides events and related interfaces for handling hardware
  * agnostic pointer input from mouse, touchscreen and keyboard.
- * It is inspired by [PointerEvents](https://www.w3.org/TR/pointerevents/).
+ * It is inspired by PointerEvents https://www.w3.org/TR/pointerevents/
+ *
+ * Please report bugs at https://github.com/arodic/PointerEvents/issues
  *
  * @event contextmenu
  * @event keydown - requires focus
@@ -18,14 +20,14 @@
  */
 
 export class PointerEvents {
-	constructor(domElement) {
+	constructor(domElement, params = {}) {
 		if (domElement === undefined || !(domElement instanceof HTMLElement)) {
 			console.warn('PointerEvents: domElement is mandatory in constructor!');
 			domElement = document;
 		}
 
 		this.domElement = domElement;
-		this.pointers = new PointerArray(domElement);
+		this.pointers = new PointerArray(domElement, params.normalized);
 
 		const scope = this;
 		let dragging = false;
@@ -53,7 +55,9 @@ export class PointerEvents {
 			scope.dispatchEvent(makePointerEvent("pointermove", scope.pointers));
 		}
 		function _onMouseHover(event) {
-			scope.pointers.update(event, "pointerhover", true);
+			scope.pointers.update(event, "pointerhover");
+			// TODO: UNHACK!
+			scope.pointers[0].start.copy(scope.pointers[0].position);
 			scope.dispatchEvent(makePointerEvent("pointerhover", scope.pointers));
 		}
 		function _onMouseUp(event) {
@@ -178,65 +182,39 @@ class Pointer {
 		this.target = target;
 		this.type = type;
 		this.pointerType = pointerType;
-		this.clientX = 0;
-		this.clientY = 0;
-		this.x = 0;
-		this.y = 0;
-		this.startX = 0;
-		this.startY = 0;
-		this.movementX = 0;
-		this.movementY = 0;
-		this.distanceX = 0;
-		this.distanceY = 0;
+		this.position = new Vector2();
+		this.previous = new Vector2();
+		this.start = new Vector2();
+		this.movement = new Vector2();
+		this.distance = new Vector2();
 		this.button = -1;
 		this.buttons = 0;
 	}
 	clone() {
 		const pointer = new Pointer(this.pointerID, this.target, this.type, this.pointerType);
-		pointer.clientX = this.clientX;
-		pointer.clientY = this.clientY;
-		pointer.x = this.x;
-		pointer.y = this.y;
-		pointer.startX = this.startX;
-		pointer.startY = this.startY;
-		pointer.movementX = this.movementX;
-		pointer.movementXY = this.movementXY;
-		pointer.distanceX = this.distanceX;
-		pointer.distanceY = this.distanceY;
+		pointer.position.copy(this.position);
+		pointer.previous.copy(this.previous);
+		pointer.start.copy(this.start);
+		pointer.movement.copy(this.movement);
+		pointer.distance.copy(this.distance);
 		pointer.button = this.button;
 		pointer.buttons = this.buttons;
 		return pointer;
 	}
-	toRectSpace() {
-		const rect = this.target.getBoundingClientRect();
-		const pointer = this.clone();
-		pointer.clientX = this.clientX / window.innerWidth * 2.0 - 1.0;
-		pointer.clientY = this.clientY / window.innerHeight * -2.0 + 1.0;
-		pointer.x = (this.x - rect.left) / rect.width * 2.0 - 1.0;
-		pointer.y = (this.y - rect.top) / rect.height * -2.0 + 1.0;
-		pointer.startX = (this.startX - rect.left) / rect.width * 2.0 - 1.0;
-		pointer.startY = (this.startY - rect.top) / rect.height * -2.0 + 1.0;
-		pointer.movementX = this.movementX / rect.width * 2.0;
-		pointer.movementY = this.movementY / rect.height * -2.0;
-		pointer.distanceX = this.distanceX / rect.width * 2.0;
-		pointer.distanceY = this.distanceY / rect.height * -2.0;
-		return pointer;
-	}
 	update(previous) {
 		this.pointerID = previous.pointerID;
-		this.startX = previous.startX;
-		this.startY = previous.startY;
-		this.movementX = this.x - previous.x;
-		this.movementY = this.y - previous.y;
-		this.distanceX = this.x - this.startX;
-		this.distanceY = this.y - this.startY;
+		this.previous.copy(previous.position);
+		this.start.copy(previous.start);
+		this.movement.copy(this.position).sub(previous.position);
+		this.distance.copy(this.position).sub(this.start);
 	}
 }
 
 class PointerArray extends Array {
-	constructor(domElement) {
+	constructor(target, normalized) {
 		super();
-		this.target = domElement;
+		this.normalized = normalized || false;
+		this.target = target;
 		this.previous = [];
 		this.removed = [];
 	}
@@ -254,22 +232,28 @@ class PointerArray extends Array {
 
 		let touches = event.touches ? event.touches : [event];
 		let pointerType = event.touches ? 'touch' : 'mouse';
-		let buttons = event.buttons || 0;
+		let buttons = event.buttons || 1;
 
 		let id = 0;
 		if (!remove) for (let i = 0; i < touches.length; i++) {
 			if (isTouchInTarget(touches[i], this.target) || event.touches === undefined) {
 				let pointer =  new Pointer(id, this.target, type, pointerType);
-				pointer.clientX = touches[i].clientX;
-				pointer.clientY = touches[i].clientY;
-				pointer.x = touches[i].clientX - rect.x;
-				pointer.y = touches[i].clientY - rect.y;
-				pointer.startX = touches[i].clientX - rect.x;
-				pointer.startY = touches[i].clientY - rect.y;
+				pointer.position.set(
+					touches[i].clientX - rect.x,
+					touches[i].clientY - rect.y
+				);
+				if (this.normalized) {
+					const rect = this.target.getBoundingClientRect();
+					pointer.position.x = (pointer.position.x - rect.left) / rect.width * 2.0 - 1.0;
+					pointer.position.y = (pointer.position.y - rect.top) / rect.height * - 2.0 + 1.0;
+				}
+				pointer.previous.copy(pointer.position);
+				pointer.start.copy(pointer.position);
 				pointer.buttons = buttons;
-				if (buttons === 1 || buttons === 3 || buttons === 5 || buttons === 7) pointer.button = 1;
-				else if (buttons === 2 || buttons === 6) pointer.button = 2;
-				else if (buttons === 4) pointer.button = 3;
+				pointer.button = -1;
+				if (buttons === 1 || buttons === 3 || buttons === 5 || buttons === 7) pointer.button = 0;
+				else if (buttons === 2 || buttons === 6) pointer.button = 1;
+				else if (buttons === 4) pointer.button = 2;
 				pointer.altKey = event.altKey;
 				pointer.ctrlKey = event.ctrlKey;
 				pointer.metaKey = event.metaKey;
@@ -317,13 +301,60 @@ function getClosest(pointer, pointers) {
 	let closestDist = Infinity;
 	let closest;
 	for (let i = 0; i < pointers.length; i++) {
-		let dx = pointer.x - pointers[i].x;
-		let dy = pointer.y - pointers[i].y;
-		let dist = Math.sqrt(dx * dx + dy * dy);
+		let dist = pointer.position.distanceTo(pointers[i].position);
 		if (dist < closestDist) {
 			closest = pointers[i];
 			closestDist = dist;
 		}
 	}
 	return closest;
+}
+
+class Vector2 {
+	constructor(x, y) {
+		this.set(x, y);
+	}
+	set(x, y) {
+		this.x = x;
+		this.y = y;
+		return this;
+	}
+	clone() {
+		return new Vector2(this.x, this.y);
+	}
+	copy(v) {
+		this.x = v.x;
+		this.y = v.y;
+		return this;
+	}
+	add(v) {
+		this.x += v.x;
+		this.y += v.y;
+		return this;
+	}
+	sub(v) {
+		this.x -= v.x;
+		this.y -= v.y;
+		return this;
+	}
+	multiply(v) {
+		this.x *= v.x;
+		this.y *= v.y;
+		return this;
+	}
+	multiplyScalar(scalar) {
+		this.x *= scalar;
+		this.y *= scalar;
+		return this;
+	}
+	length() {
+		return Math.sqrt(this.x * this.x + this.y * this.y);
+	}
+	distanceTo(v) {
+		return Math.sqrt(this.distanceToSquared(v));
+	}
+	distanceToSquared(v) {
+		var dx = this.x - v.x, dy = this.y - v.y;
+		return dx * dx + dy * dy;
+	}
 }
